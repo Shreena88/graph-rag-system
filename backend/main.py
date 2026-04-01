@@ -4,7 +4,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from backend.api.routes import documents, query, graph
 from backend.config import settings
 from backend.graph.neo4j_client import neo4j_client
-from backend.services import redis_client
 
 
 @asynccontextmanager
@@ -35,7 +34,6 @@ async def lifespan(app: FastAPI):
         await neo4j_client.close()
     except Exception:
         pass
-    await redis_client.close()
 
 
 app = FastAPI(title="Graph RAG System", version="0.1.0", lifespan=lifespan)

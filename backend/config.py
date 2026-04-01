@@ -8,9 +8,6 @@ class Settings(BaseSettings):
     neo4j_user: str = "neo4j"
     neo4j_password: str = "password"
 
-    # Redis
-    redis_url: str = "redis://localhost:6379"
-
     # LLM (Groq only)
     groq_api_key: str = ""
     llm_model: str = "llama-3.3-70b-versatile"

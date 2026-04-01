@@ -1,4 +1,5 @@
 import uuid
+import json
 import logging
 from datetime import datetime
 from backend.nlp.ocr import DocumentParser
@@ -7,7 +8,6 @@ from backend.nlp.entity_extractor import EntityExtractor
 from backend.graph.neo4j_client import neo4j_client
 from backend.vector.store import vector_store
 from backend.models.document import DocumentResult
-from backend.services import redis_client
 from backend.config import settings
 
 logger = logging.getLogger(__name__)
@@ -16,22 +16,32 @@ parser = DocumentParser(use_gpu=settings.use_gpu)
 chunker = SemanticChunker()
 extractor = EntityExtractor()
 
+# In-memory document status store
+_status_store: dict[str, str] = {}
+
+
+def _set_status(doc_id: str, result: DocumentResult) -> None:
+    _status_store[doc_id] = result.model_dump_json()
+
+
+def _get_status(doc_id: str) -> DocumentResult | None:
+    data = _status_store.get(doc_id)
+    if data:
+        return DocumentResult.model_validate(json.loads(data))
+    return None
+
 
 async def register_document(filename: str) -> str:
     """Register a document and return its ID immediately (before ingestion starts)."""
     doc_id = str(uuid.uuid4())
-    await redis_client.set_status(doc_id, DocumentResult(
-        doc_id=doc_id, filename=filename, status="processing"
-    ))
+    _set_status(doc_id, DocumentResult(doc_id=doc_id, filename=filename, status="processing"))
     return doc_id
 
 
 async def ingest_document(file_path: str, filename: str, doc_id: str = None) -> str:
     if doc_id is None:
         doc_id = str(uuid.uuid4())
-        await redis_client.set_status(doc_id, DocumentResult(
-            doc_id=doc_id, filename=filename, status="processing"
-        ))
+        _set_status(doc_id, DocumentResult(doc_id=doc_id, filename=filename, status="processing"))
     try:
         # 1. Parse
         parsed = parser.parse(file_path, filename)
@@ -78,7 +88,6 @@ async def ingest_document(file_path: str, filename: str, doc_id: str = None) -> 
                     name=entity.canonical_name, type=entity.type, chunk_id=chunk.chunk_id,
                 )
 
-            # Persist entity-to-entity relations (SVO + co-occurrence)
             for rel in extraction.relations:
                 if rel.subject and rel.object and rel.subject != rel.object:
                     await neo4j_client.run_write(
@@ -99,13 +108,13 @@ async def ingest_document(file_path: str, filename: str, doc_id: str = None) -> 
                 page_number=chunk.page_number,
             )
 
-        await redis_client.set_status(doc_id, DocumentResult(
+        _set_status(doc_id, DocumentResult(
             doc_id=doc_id, filename=filename, status="indexed",
             chunk_count=len(chunks), entity_count=entity_count,
         ))
     except Exception as e:
         logger.exception("Ingestion failed for %s: %s", filename, e)
-        await redis_client.set_status(doc_id, DocumentResult(
+        _set_status(doc_id, DocumentResult(
             doc_id=doc_id, filename=filename, status="failed", error=str(e)
         ))
 
@@ -113,4 +122,4 @@ async def ingest_document(file_path: str, filename: str, doc_id: str = None) -> 
 
 
 async def get_status(doc_id: str) -> DocumentResult | None:
-    return await redis_client.get_status(doc_id)
+    return _get_status(doc_id)

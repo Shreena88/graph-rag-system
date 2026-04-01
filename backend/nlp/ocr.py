@@ -66,8 +66,17 @@ class DocumentParser:
         return pages
 
     def _extract_text(self, path: str) -> List[PageContent]:
-        with open(path, "r", encoding="utf-8") as f:
-            text = f.read()
+        # Try UTF-8 first, fall back to UTF-16, then latin-1 as last resort
+        for encoding in ("utf-8-sig", "utf-16", "latin-1"):
+            try:
+                with open(path, "r", encoding=encoding) as f:
+                    text = f.read()
+                return [PageContent(page_number=1, text=text)]
+            except (UnicodeDecodeError, UnicodeError):
+                continue
+        # Binary fallback — decode with replacement characters
+        with open(path, "rb") as f:
+            text = f.read().decode("utf-8", errors="replace")
         return [PageContent(page_number=1, text=text)]
 
     def _extract_docx(self, path: str) -> List[PageContent]:
