@@ -6,6 +6,8 @@ A Retrieval-Augmented Generation (RAG) system that combines a **knowledge graph*
 
 ## Architecture
 
+![Workflow](workflow.png)
+
 ```
 Documents (PDF, DOCX, images)
         │
