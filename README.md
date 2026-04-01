@@ -2,14 +2,16 @@
 
 A Retrieval-Augmented Generation (RAG) system that combines a **knowledge graph** (Neo4j) with **vector search** (FAISS) to answer questions over uploaded documents. Documents are parsed, chunked, entity-extracted, and stored as a graph — queries traverse that graph and rank results with a hybrid ranker before streaming an LLM answer.
 
+## Workflow
+
+![Workflow](workflow.png)
+
 ---
 
 ## Architecture
 
-![Workflow](workflow.png)
-
 ```
-Documents (PDF, DOCX, images)
+Documents (PDF, DOCX, TXT, images)
         │
         ▼
   DocumentParser (pdfplumber / PaddleOCR)
@@ -31,12 +33,11 @@ Documents (PDF, DOCX, images)
 
 | Layer | Technology |
 |---|---|
-| Backend | FastAPI + Python 3.11 |
+| Backend | FastAPI + Python 3.12 |
 | Graph DB | Neo4j 5.19 (Graph Data Science plugin) |
 | Vector Store | FAISS + `all-MiniLM-L6-v2` embeddings |
 | NLP | spaCy `en_core_web_sm` |
 | LLM | Groq API (`llama-3.3-70b-versatile`) |
-| Cache | Redis 7 |
 | Frontend | React + TypeScript + Vite + Tailwind CSS |
 | Container | Docker Compose |
 
@@ -54,13 +55,7 @@ Documents (PDF, DOCX, images)
 
 ### 1. Configure environment
 
-Copy and edit the env file inside `graph-rag-system/`:
-
-```bash
-cp graph-rag-system/.env.example graph-rag-system/.env
-```
-
-Set your Groq API key:
+Create a `.env` file in the project root:
 
 ```env
 GROQ_API_KEY=your_groq_api_key_here
@@ -70,7 +65,6 @@ NEO4J_URI=bolt://neo4j:7687
 NEO4J_USER=neo4j
 NEO4J_PASSWORD=password
 
-REDIS_URL=redis://redis:6379
 EMBEDDING_MODEL=all-MiniLM-L6-v2
 MAX_UPLOAD_SIZE_MB=100
 CORS_ORIGINS=["http://localhost:5173"]
@@ -80,13 +74,11 @@ USE_GPU=false
 ### 2. Start all services
 
 ```bash
-cd graph-rag-system
 docker compose up --build
 ```
 
 This starts:
 - Neo4j at `http://localhost:7474` (browser UI) / `bolt://localhost:7687`
-- Redis at `localhost:6379`
 - Backend API at `http://localhost:8000`
 - Frontend at `http://localhost:5173`
 
@@ -103,8 +95,12 @@ docker compose exec backend python -m spacy download en_core_web_sm
 ### Backend
 
 ```bash
-cd graph-rag-system/backend
-pip install -r requirements.txt
+cd graph-rag-system
+python -m venv .venv
+.venv\Scripts\activate        # Windows
+# source .venv/bin/activate   # macOS/Linux
+
+pip install -r backend/requirements.txt
 python -m spacy download en_core_web_sm
 uvicorn backend.main:app --reload --port 8000
 ```
@@ -112,7 +108,7 @@ uvicorn backend.main:app --reload --port 8000
 ### Frontend
 
 ```bash
-cd graph-rag-system/frontend
+cd frontend
 npm install
 npm run dev
 ```
@@ -123,7 +119,7 @@ npm run dev
 
 | Method | Path | Description |
 |---|---|---|
-| `POST` | `/api/documents/upload` | Upload a document (PDF, DOCX, image) |
+| `POST` | `/api/documents/upload` | Upload a document (PDF, DOCX, TXT, image) |
 | `GET` | `/api/documents/{doc_id}/status` | Poll ingestion status |
 | `POST` | `/api/query` | Ask a question (streaming SSE response) |
 | `GET` | `/api/graph/{doc_id}` | Fetch graph nodes/edges for a document |
@@ -173,7 +169,7 @@ graph-rag-system/
 ## Testing
 
 ```bash
-cd graph-rag-system/backend
+cd backend
 pytest tests/ -v
 ```
 
@@ -190,7 +186,6 @@ Tests use `pytest-asyncio` and `hypothesis` for property-based testing.
 | `NEO4J_URI` | `bolt://localhost:7687` | Neo4j connection URI |
 | `NEO4J_USER` | `neo4j` | Neo4j username |
 | `NEO4J_PASSWORD` | `password` | Neo4j password |
-| `REDIS_URL` | `redis://localhost:6379` | Redis connection URL |
 | `EMBEDDING_MODEL` | `all-MiniLM-L6-v2` | Sentence-transformers model |
 | `MAX_UPLOAD_SIZE_MB` | `100` | Max document upload size |
 | `USE_GPU` | `false` | Enable GPU for OCR/embeddings |
