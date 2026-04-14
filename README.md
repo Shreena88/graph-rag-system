@@ -69,7 +69,6 @@ NEO4J_URI=bolt://neo4j:7687
 NEO4J_USER=neo4j
 NEO4J_PASSWORD=password
 
-REDIS_URL=redis://redis:6379
 EMBEDDING_MODEL=all-MiniLM-L6-v2
 MAX_UPLOAD_SIZE_MB=100
 CORS_ORIGINS=["http://localhost:5173"]
@@ -188,7 +187,6 @@ Tests use `pytest-asyncio` and `hypothesis` for property-based testing.
 | `NEO4J_URI` | `bolt://localhost:7687` | Neo4j connection URI |
 | `NEO4J_USER` | `neo4j` | Neo4j username |
 | `NEO4J_PASSWORD` | `password` | Neo4j password |
-| `REDIS_URL` | `redis://localhost:6379` | Redis connection URL |
 | `EMBEDDING_MODEL` | `all-MiniLM-L6-v2` | Sentence-transformers model |
 | `MAX_UPLOAD_SIZE_MB` | `100` | Max document upload size |
 | `USE_GPU` | `false` | Enable GPU for OCR/embeddings |
