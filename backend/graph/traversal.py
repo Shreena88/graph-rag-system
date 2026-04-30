@@ -60,15 +60,15 @@ class GraphTraversal:
 
     async def multi_hop(self, query: ParsedQuery) -> dict:
         bfs_results = await self.bfs(
-            seed_entities=[e.name for e in query.entities],
+            seed_entities=[e.name.lower().strip() for e in query.entities],
             max_depth=query.max_hops if hasattr(query, "max_hops") else 3,
         )
         dfs_results = []
         if query.intent in ("causal", "procedural") and len(query.entities) >= 2:
             for i in range(len(query.entities) - 1):
                 paths = await self.dfs_path(
-                    query.entities[i].name,
-                    query.entities[i + 1].name,
+                    query.entities[i].name.lower().strip(),
+                    query.entities[i + 1].name.lower().strip(),
                 )
                 dfs_results.extend(paths)
 
