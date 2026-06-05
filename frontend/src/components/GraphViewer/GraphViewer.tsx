@@ -1,189 +1,228 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import CytoscapeComponent from "react-cytoscapejs";
-import type { Core, EventObject, ElementDefinition } from "cytoscape";
-import { getEntities, getEdges } from "../../api/client";
+import cytoscape from "cytoscape";
+import { getEdges, getEntities } from "../../api/client";
+import { ZoomIn, ZoomOut, Maximize } from "lucide-react";
 
 interface Props {
   docId?: string;
+  onGraphStats?: (nodes: number, edges: number) => void;
 }
 
-const TYPE_COLORS: Record<string, string> = {
-  PERSON: "#4a90d9",
-  ORG: "#e67e22",
-  LOCATION: "#27ae60",
-  DATE: "#8e44ad",
-  CONCEPT: "#c0392b",
-  LAW: "#16a085",
-  PRODUCT: "#d35400",
-  DEFAULT: "#4a90d9",
-};
+const STYLESHEET: any = [
+  {
+    selector: "node",
+    style: {
+      label: "data(label)",
+      "text-valign": "center",
+      "text-halign": "center",
+      "font-size": "10px",
+      "background-color": "data(color)",
+      color: "#f8fafc",
+      "text-outline-width": 1,
+      "text-outline-color": "#1e293b",
+      width: "data(size)",
+      height: "data(size)",
+    },
+  },
+  {
+    selector: "edge",
+    style: {
+      width: 1,
+      "line-color": "#475569",
+      "target-arrow-color": "#475569",
+      "target-arrow-shape": "triangle",
+      "curve-style": "bezier",
+      opacity: 0.6,
+    },
+  },
+];
 
-export const GraphViewer: React.FC<Props> = ({ docId }) => {
-  const [elements, setElements] = useState<ElementDefinition[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [cy, setCy] = useState<Core | null>(null);
+const TYPE_COLORS: Record<string, string> = {
+  Document: "#10b981",
+  Chunk: "#f59e0b",
+  PERSON: "#3b82f6",
+  ORG: "#8b5cf6",
+  GPE: "#ec4899",
+  LOC: "#06b6d4",
+  DATE: "#eab308",
+  EVENT: "#f43f5e",
+};
+const FALLBACK_PALETTE = [
+  "#14b8a6", // teal
+  "#84cc16", // lime
+  "#d946ef", // fuchsia
+  "#ef4444", // red
+  "#0ea5e9", // sky
+  "#8b5cf6", // violet
+  "#f97316", // orange
+  "#64748b", // slate
+];
+const DEFAULT_COLOR = "#94a3b8";
+
+export const GraphViewer: React.FC<Props> = ({ docId, onGraphStats }) => {
+  const [elements, setElements] = useState<cytoscape.ElementDefinition[]>([]);
+  const [activeTab, setActiveTab] = useState("Graph");
+  const cyRef = useRef<cytoscape.Core | null>(null);
 
   const loadGraph = useCallback(async (id?: string) => {
-    if (!id) return;
-    setLoading(true);
+    if (!id) {
+      setElements([]);
+      onGraphStats?.(0, 0);
+      return;
+    }
     try {
       const [entRes, edgeRes] = await Promise.all([
         getEntities(id),
         getEdges(id),
       ]);
 
-      const maxMentions = Math.max(...entRes.data.map((e) => e.mentions), 1);
+      const nodeIds = new Set(entRes.data.map((e: any) => e.name));
+      
+      const validEdgesRaw = edgeRes.data.filter((r: any) => nodeIds.has(r.source) && nodeIds.has(r.target));
+      const connectedNodeIds = new Set();
+      validEdgesRaw.forEach((r: any) => {
+        connectedNodeIds.add(r.source);
+        connectedNodeIds.add(r.target);
+      });
 
-      const nodes: ElementDefinition[] = entRes.data.map((e) => ({
+      const dynamicColors: Record<string, string> = {};
+
+      const nodes: cytoscape.ElementDefinition[] = entRes.data
+        .filter((e: any) => connectedNodeIds.has(e.name))
+        .map((e: any) => {
+        let typeColor = TYPE_COLORS[e.type];
+        if (!typeColor) {
+          if (!dynamicColors[e.type]) {
+            dynamicColors[e.type] = FALLBACK_PALETTE[Object.keys(dynamicColors).length % FALLBACK_PALETTE.length];
+          }
+          typeColor = dynamicColors[e.type];
+        }
+
+        return {
+          data: {
+            id: e.name,
+            label: e.name.length > 15 ? e.name.slice(0, 15) + "..." : e.name,
+            type: e.type,
+            size: Math.min(30 + e.mentions * 2, 60),
+            color: typeColor,
+          },
+        };
+      });
+
+      const edges: cytoscape.ElementDefinition[] = validEdgesRaw.map((r: any, i: number) => ({
         data: {
-          id: e.name,
-          label: e.name,
-          type: e.type,
-          mentions: e.mentions,
-          size: 20 + (e.mentions / maxMentions) * 60,
-          color: TYPE_COLORS[e.type] ?? TYPE_COLORS.DEFAULT,
+          id: `e${i}`,
+          source: r.source,
+          target: r.target,
+          weight: r.weight,
         },
       }));
 
-      // Build a set of valid node IDs so we can filter dangling edges
-      const nodeIds = new Set(nodes.map((n) => n.data.id as string));
-
-      const edges: ElementDefinition[] = edgeRes.data
-        .filter((e) => e.source !== e.target)
-        .filter((e) => nodeIds.has(e.source) && nodeIds.has(e.target))
-        .map((e, i) => ({
-          data: {
-            id: `e${i}`,
-            source: e.source,
-            target: e.target,
-            weight: e.weight,
-          },
-        }));
-
-      // Only keep nodes that appear in at least one edge
-      const connectedIds = new Set(edges.flatMap((e) => [e.data.source as string, e.data.target as string]));
-      const connectedNodes = nodes.filter((n) => connectedIds.has(n.data.id as string));
-
-      setElements([...connectedNodes, ...edges]);
+      setElements([...nodes, ...edges]);
+      onGraphStats?.(nodes.length, edges.length);
     } catch {
-      // graph unavailable
+      setElements([]);
+      onGraphStats?.(0, 0);
     }
-    setLoading(false);
   }, []);
 
   useEffect(() => {
     loadGraph(docId);
   }, [docId, loadGraph]);
 
-  // fit graph after layout completes
-  useEffect(() => {
-    if (cy && elements.length > 0) {
-      setTimeout(() => {
-        try { cy.fit(undefined, 40); } catch { /* cy may have been destroyed */ }
-      }, 800);
+  const fitGraph = () => {
+    if (cyRef.current) {
+      cyRef.current.fit(undefined, 30);
     }
-  }, [cy, elements]);
+  };
+
+  const zoomIn = () => cyRef.current?.zoom(cyRef.current.zoom() * 1.2);
+  const zoomOut = () => cyRef.current?.zoom(cyRef.current.zoom() * 0.8);
 
   return (
-    <>
-      <div className="graph-header">
-        Knowledge Graph
-        {loading && <span style={{ fontSize: 11, color: "#475569", marginLeft: 8 }}>loading...</span>}
-        {elements.length > 0 && !loading && (
-          <span style={{ fontSize: 11, color: "#475569", marginLeft: 8 }}>
-            {elements.filter((e) => !e.data.source).length} nodes
-          </span>
-        )}
+    <div className="flex flex-col h-full bg-slate-900 rounded-bl-xl border-l border-white/5">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-white/5 backdrop-blur-xl">
+        <div className="flex items-center gap-6">
+          {['Graph', 'Raw Data'].map(tab => (
+            <button 
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`text-sm font-medium pb-4 -mb-4 border-b-2 transition-colors ${
+                activeTab === tab 
+                  ? 'border-violet-500 text-violet-400' 
+                  : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
+        
+        <div className="flex items-center gap-2">
+           <button onClick={zoomIn} className="p-1.5 rounded bg-white/5 text-slate-400 hover:text-white hover:bg-white/10 transition-colors">
+              <ZoomIn className="w-4 h-4" />
+           </button>
+           <button onClick={zoomOut} className="p-1.5 rounded bg-white/5 text-slate-400 hover:text-white hover:bg-white/10 transition-colors">
+              <ZoomOut className="w-4 h-4" />
+           </button>
+           <button onClick={fitGraph} className="p-1.5 rounded bg-white/5 text-slate-400 hover:text-white hover:bg-white/10 transition-colors">
+              <Maximize className="w-4 h-4" />
+           </button>
+        </div>
       </div>
-      <div className="graph-container">
-        {elements.length === 0 && !loading ? (
-          <div className="graph-empty">
-            <div className="graph-empty-icon">◎</div>
-            <div>Graph will appear after upload</div>
+
+      <div className="flex-1 relative overflow-hidden bg-slate-950/50">
+        {!docId ? (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 text-slate-500">
+            <div className="text-5xl opacity-30">◎</div>
+            <div className="text-sm">Graph will appear after upload</div>
           </div>
-        ) : elements.filter((e) => e.data.source).length === 0 && !loading ? (
-          <div className="graph-empty">
-            <div className="graph-empty-icon">◎</div>
-            <div>No relationships found in document</div>
+        ) : elements.length === 0 ? (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 text-slate-500">
+            <div className="text-5xl opacity-30 animate-pulse">◎</div>
+            <div className="text-sm">Graph unavailable or empty</div>
+          </div>
+        ) : activeTab === 'Raw Data' ? (
+          <div className="absolute inset-0 overflow-auto p-6 text-xs text-slate-300 font-mono whitespace-pre-wrap bg-slate-950">
+            {JSON.stringify(elements.map(e => e.data), null, 2)}
           </div>
         ) : (
-          <CytoscapeComponent
-            elements={elements}
-            style={{ width: "100%", height: "100%", background: "#0f172a" }}
-            layout={{
-              name: "cose",
-              animate: true,
-              animationDuration: 600,
-              nodeRepulsion: () => 8000,
-              idealEdgeLength: () => 80,
-              edgeElasticity: () => 100,
-              gravity: 0.25,
-              numIter: 1000,
-              fit: true,
-              padding: 40,
-            } as any}
-            cy={(c: Core) => {
-              setCy(c);
-              c.on("tap", "node", (e: EventObject) => {
-                const node = e.target;
-                node.neighborhood().addClass("highlighted");
-              });
-              c.on("tap", (e: EventObject) => {
-                if (e.target === c) c.elements().removeClass("highlighted");
-              });
-            }}
-            stylesheet={[
-              {
-                selector: "node",
-                style: {
-                  width: "data(size)",
-                  height: "data(size)",
-                  "background-color": "data(color)",
-                  label: "data(label)",
-                  color: "#1e293b",
-                  "font-size": 9,
-                  "font-weight": "bold",
-                  "text-valign": "center",
-                  "text-halign": "center",
-                  "text-wrap": "wrap",
-                  "text-max-width": "80px",
-                  "text-background-color": "white",
-                  "text-background-opacity": 0.75,
-                  "text-background-padding": "2px",
-                  "text-background-shape": "roundrectangle",
-                  "border-width": 1.5,
-                  "border-color": "white",
-                  "border-opacity": 0.4,
-                },
-              },
-              {
-                selector: "edge",
-                style: {
-                  "line-color": "#94a3b8",
-                  width: 0.8,
-                  opacity: 0.5,
-                  "curve-style": "bezier",
-                },
-              },
-              {
-                selector: ".highlighted",
-                style: {
-                  "border-color": "#f59e0b",
-                  "border-width": 3,
-                  opacity: 1,
-                },
-              },
-              {
-                selector: "node:selected",
-                style: {
-                  "border-color": "#f59e0b",
-                  "border-width": 3,
-                },
-              },
-            ]}
-          />
+          <>
+            <CytoscapeComponent
+              elements={elements}
+              stylesheet={STYLESHEET}
+              style={{ width: "100%", height: "100%", position: "absolute", top: 0, left: 0 }}
+              layout={{ 
+                name: "cose", 
+                padding: 50, 
+                animate: false,
+                nodeRepulsion: () => 4000000,
+                idealEdgeLength: () => 100,
+                nodeOverlap: 50,
+                gravity: 80
+              } as any}
+              cy={(cy) => {
+                cyRef.current = cy;
+                cy.on("layoutstop", () => cy.fit(undefined, 30));
+              }}
+            />
+            
+            <div className="absolute bottom-4 left-4 bg-slate-900/80 backdrop-blur-md border border-white/10 rounded-lg p-3 text-xs flex flex-col gap-2 shadow-xl max-h-64 overflow-y-auto">
+              <div className="font-semibold text-slate-400 mb-1">Legend</div>
+              {Array.from(new Set(elements.filter(e => e.data?.type).map(e => e.data.type as string))).map(type => (
+                <div key={type} className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded" style={{ backgroundColor: elements.find(e => e.data.type === type)?.data.color as string || DEFAULT_COLOR }}></div>
+                  <span className="text-slate-300">{type}</span>
+                </div>
+              ))}
+            </div>
+            
+
+          </>
         )}
       </div>
-    </>
+    </div>
   );
 };
+

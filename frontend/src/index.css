@@ -1,3 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
@@ -213,3 +217,13 @@ body {
 }
 
 .graph-empty-icon { font-size: 40px; opacity: 0.4; }
+
+/* Light Theme Override */
+html.light-theme {
+  filter: invert(1) hue-rotate(180deg);
+}
+
+html.light-theme img, 
+html.light-theme video {
+  filter: invert(1) hue-rotate(180deg);
+}
