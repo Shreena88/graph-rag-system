@@ -44,7 +44,7 @@ async def lifespan(app: FastAPI):
         pass
 
 
-app = FastAPI(title="Graph RAG System", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="GraphAtlas", version="0.1.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,

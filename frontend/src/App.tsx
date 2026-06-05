@@ -30,7 +30,7 @@ export default function App() {
   return (
     <div className="app">
       <aside className="sidebar">
-        <div className="sidebar-title">Graph <span>RAG</span></div>
+        <div className="sidebar-title">Graph<span>Atlas</span></div>
         <DocumentUpload onUploaded={handleUploaded} />
         <div className="doc-count">{docIds.length} document(s) indexed</div>
       </aside>
