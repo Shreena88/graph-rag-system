@@ -2,6 +2,9 @@
 
 A Retrieval-Augmented Generation (RAG) system that combines a **knowledge graph** (Neo4j) with **vector search** (FAISS) to answer questions over uploaded documents. Documents are parsed, chunked, entity-extracted, and stored as a graph — queries traverse that graph and rank results with a hybrid ranker before streaming an LLM answer.
 
+![GraphAtlas UI - Dark Mode](screenshot.png)
+![GraphAtlas UI - Light Mode](screenshot2.png)
+
 ---
 
 ## Architecture
@@ -100,8 +103,8 @@ docker compose exec backend python -m spacy download en_core_web_sm
 ### Backend
 
 ```bash
-cd graph-rag-system/backend
-pip install -r requirements.txt
+cd graph-rag-system
+pip install -r backend/requirements.txt
 python -m spacy download en_core_web_sm
 uvicorn backend.main:app --reload --port 8000
 ```

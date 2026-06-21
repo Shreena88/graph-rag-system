@@ -1,40 +1,29 @@
-from typing import AsyncIterator, List
-from backend.nlp.entity_extractor import EntityExtractor
-from backend.nlp.query_parser import QueryParser
-from backend.graph.traversal import GraphTraversal
-from backend.graph.neo4j_client import neo4j_client
-from backend.vector.store import vector_store
-from backend.vector.hybrid_ranker import HybridRanker
-from backend.llm.router import LLMRouter
-from backend.llm.prompt_builder import build_rag_prompt
-from backend.models.query import QueryRequest, ParsedQuery
+"""
+Query service — thin wrapper around the LangGraph RAG pipeline.
 
-_extractor = EntityExtractor()
-_parser = QueryParser(_extractor)
-_traversal = GraphTraversal(neo4j_client)
-_ranker = HybridRanker()
-_llm = LLMRouter()
+The pipeline handles all orchestration:
+  parse_query → graph_search → vector_search → hybrid_rank → generate
+"""
+
+from typing import AsyncIterator
+
+from backend.models.query import QueryRequest
+from backend.pipeline import rag_graph
 
 
 async def answer_query(request: QueryRequest) -> AsyncIterator[str]:
-    # 1. Understand query
-    parsed: ParsedQuery = _parser.parse(request.question)
+    """Run the RAG pipeline and stream answer tokens back to the caller."""
+    initial_state = {
+        "request": request,
+        "parsed": None,
+        "graph_chunks": [],
+        "vector_results": [],
+        "ranked_chunks": [],
+        "prompt": "",
+        "answer_tokens": [],
+    }
 
-    # 2. Graph traversal (graceful fallback if Neo4j unavailable)
-    graph_chunks = []
-    try:
-        traversal_result = await _traversal.multi_hop(parsed)
-        graph_chunks = traversal_result["bfs_chunks"]
-    except Exception:
-        pass  # continue with vector-only search
+    final_state = await rag_graph.ainvoke(initial_state)
 
-    # 3. Vector search
-    vector_results = vector_store.search(request.question, top_k=request.top_k)
-
-    # 4. Hybrid rank
-    ranked = _ranker.rank(graph_chunks, vector_results, top_k=request.top_k)
-
-    # 5. Build prompt + stream answer
-    prompt = build_rag_prompt(parsed, ranked)
-    async for token in _llm.generate(prompt):
+    for token in final_state["answer_tokens"]:
         yield token
