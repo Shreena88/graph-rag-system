@@ -3,13 +3,15 @@
 A Retrieval-Augmented Generation (RAG) system that combines a **knowledge graph** (Neo4j) with **vector search** (FAISS) to answer questions over uploaded documents. Documents are parsed, chunked, entity-extracted, and stored as a graph — queries traverse that graph and rank results with a hybrid ranker before streaming an LLM answer.
 
 ![GraphAtlas UI - Dark Mode](screenshot.png)
+
+Light mode
 ![GraphAtlas UI - Light Mode](screenshot2.png)
 
 ---
 
 ## Architecture
 
-![Workflow](workflow.png)
+![Workflow]
 
 ```
 Documents (PDF, DOCX, images)
