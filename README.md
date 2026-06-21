@@ -11,7 +11,6 @@ Light mode
 
 ## Architecture
 
-![Workflow]
 
 ```
 Documents (PDF, DOCX, images)
