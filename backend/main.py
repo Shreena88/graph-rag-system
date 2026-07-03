@@ -37,6 +37,12 @@ async def lifespan(app: FastAPI):
             await neo4j_client.init_schema()
         except Exception as e:
             print(f"[Neo4j] Schema init warning: {e}")
+    
+    # Print loaded LLM config for verification
+    api_key_prefix = settings.groq_api_key[:8] if settings.groq_api_key else "None"
+    print(f"[LLM] Active Groq model: {settings.llm_model}")
+    print(f"[LLM] Groq API key starts with: {api_key_prefix}...")
+    
     yield
     try:
         await neo4j_client.close()
