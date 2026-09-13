@@ -39,3 +39,10 @@ async def get_status(doc_id: str):
     if not result:
         raise HTTPException(404, "Document not found")
     return result
+
+
+@router.delete("/{doc_id}")
+async def delete_document(doc_id: str):
+    await ingestion_service.delete_document(doc_id)
+    return {"status": "deleted", "doc_id": doc_id}
+

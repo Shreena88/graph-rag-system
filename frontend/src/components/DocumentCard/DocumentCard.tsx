@@ -1,5 +1,5 @@
 import React from 'react';
-import { FileText, CheckCircle2 } from 'lucide-react';
+import { FileText, CheckCircle2, Trash2 } from 'lucide-react';
 
 interface DocumentCardProps {
   doc: {
@@ -10,9 +10,10 @@ interface DocumentCardProps {
   };
   isActive: boolean;
   onClick: () => void;
+  onDelete?: (id: string) => void;
 }
 
-export const DocumentCard: React.FC<DocumentCardProps> = ({ doc, isActive, onClick }) => {
+export const DocumentCard: React.FC<DocumentCardProps> = ({ doc, isActive, onClick, onDelete }) => {
   // Format bytes to MB
   const sizeStr = doc.size ? `${(doc.size / (1024 * 1024)).toFixed(1)} MB` : '1.3 MB';
   const entityCount = 34; // Mocked for now
@@ -20,20 +21,34 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({ doc, isActive, onCli
   return (
     <div 
       onClick={onClick}
-      className={`relative p-3 rounded-xl border cursor-pointer transition-all ${
+      className={`group relative p-3 rounded-xl border cursor-pointer transition-all ${
         isActive 
           ? 'bg-violet-500/10 border-violet-500/50 shadow-[0_0_15px_rgba(139,92,246,0.1)]' 
           : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'
       }`}
     >
       <div className="flex items-start justify-between">
-        <div className="flex items-center gap-2 overflow-hidden">
+        <div className="flex items-center gap-2 overflow-hidden pr-2">
           <FileText className={`w-4 h-4 shrink-0 ${isActive ? 'text-violet-400' : 'text-slate-400'}`} />
           <span className={`text-sm font-medium truncate ${isActive ? 'text-violet-200' : 'text-slate-200'}`}>
             {doc.name}
           </span>
         </div>
+
+        {onDelete && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(doc.id);
+            }}
+            className="p-1 rounded-md text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors opacity-70 group-hover:opacity-100"
+            title="Delete PDF"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        )}
       </div>
+
       
       <div className="mt-3 flex items-center justify-between text-xs text-slate-400">
         <div className="flex items-center gap-1 text-emerald-400">

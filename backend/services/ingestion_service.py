@@ -123,3 +123,19 @@ async def ingest_document(file_path: str, filename: str, doc_id: str = None) -> 
 
 async def get_status(doc_id: str) -> DocumentResult | None:
     return _get_status(doc_id)
+
+
+async def delete_document(doc_id: str) -> bool:
+    """Delete a document from status store, Neo4j graph, and vector store metadata."""
+    _status_store.pop(doc_id, None)
+    try:
+        await neo4j_client.run_write(
+            "MATCH (d:Document {id: $doc_id}) OPTIONAL MATCH (d)-[:HAS_CHUNK]->(c:Chunk) DETACH DELETE c, d",
+            doc_id=doc_id
+        )
+    except Exception as e:
+        logger.warning("Failed to delete document %s from Neo4j: %s", doc_id, e)
+
+    vector_store._metadata = [m for m in vector_store._metadata if m.get("doc_id") != doc_id]
+    return True
+

@@ -5,6 +5,8 @@ import { GraphViewer } from "./components/GraphViewer/GraphViewer";
 import { Navbar } from "./components/Navbar/Navbar";
 import { Footer } from "./components/Footer/Footer";
 import { DocumentCard } from "./components/DocumentCard/DocumentCard";
+import { deleteDocument } from "./api/client";
+import { Sparkles } from "lucide-react";
 
 class GraphErrorBoundary extends Component<{ children: React.ReactNode }, { error: boolean }> {
   state = { error: false };
@@ -28,6 +30,7 @@ export default function App() {
   const [nodesCount, setNodesCount] = useState(0);
   const [edgesCount, setEdgesCount] = useState(0);
   const [rightPanelWidth, setRightPanelWidth] = useState(450);
+  const [summarizeSignal, setSummarizeSignal] = useState(0);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -57,6 +60,24 @@ export default function App() {
     setDocs((prev) => [...prev, { id: docId, name: file.name, size: file.size, status: 'Indexed' }]);
   };
 
+  const handleDeleteDocument = async (id: string) => {
+    try {
+      await deleteDocument(id);
+    } catch (e) {
+      console.warn("Error deleting document from backend:", e);
+    }
+    setDocs((prev) => prev.filter((d) => d.id !== id));
+    setDocIds((prev) => prev.filter((docId) => docId !== id));
+    if (activeDocId === id) {
+      const remaining = docs.filter((d) => d.id !== id);
+      setActiveDocId(remaining.length > 0 ? remaining[remaining.length - 1].id : undefined);
+    }
+  };
+
+  const handleSummarizeAll = () => {
+    setSummarizeSignal((prev) => prev + 1);
+  };
+
   return (
     <div className="flex flex-col h-screen w-full bg-slate-950 text-slate-200 overflow-hidden font-sans">
       <Navbar />
@@ -68,15 +89,29 @@ export default function App() {
             <DocumentUpload onUploaded={handleUploaded} />
           </div>
 
-          <div className="flex-1 overflow-y-auto">
-            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Documents</h3>
-            <div className="flex flex-col gap-3">
+          <div className="flex-1 overflow-y-auto flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Documents ({docs.length})</h3>
+            </div>
+
+            {docs.length > 0 && (
+              <button
+                onClick={handleSummarizeAll}
+                className="w-full flex items-center justify-center gap-2 py-2 px-3 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white text-xs font-medium rounded-xl shadow-lg shadow-violet-500/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                Summarize All {docs.length > 1 ? `(${docs.length} PDFs)` : ''}
+              </button>
+            )}
+
+            <div className="flex flex-col gap-3 mt-1">
               {docs.map(doc => (
                 <DocumentCard 
                   key={doc.id} 
                   doc={doc} 
                   isActive={doc.id === activeDocId} 
                   onClick={() => setActiveDocId(doc.id)} 
+                  onDelete={handleDeleteDocument}
                 />
               ))}
               {docs.length === 0 && (
@@ -89,8 +124,9 @@ export default function App() {
 
         {/* Middle Panel */}
         <div className="flex-1 flex flex-col bg-slate-950 min-w-[300px]">
-          <ChatPanel docIds={docIds} />
+          <ChatPanel docIds={docIds} summarizeSignal={summarizeSignal} />
         </div>
+
 
         {/* Resizer */}
         <div 

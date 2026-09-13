@@ -49,7 +49,7 @@ class Settings(BaseSettings):
 
     # LLM — Groq
     groq_api_key: str = ""
-    llm_model: str = "llama-3.1-8b-instant"
+    llm_model: str = "openai/gpt-oss-120b"
 
     # Embeddings
     embedding_model: str = "all-MiniLM-L6-v2"

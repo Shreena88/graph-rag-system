@@ -11,6 +11,10 @@ export const uploadDocument = (file: File) => {
 export const getDocumentStatus = (docId: string) =>
   api.get<{ doc_id: string; status: string; error?: string }>(`/documents/${docId}/status`);
 
+export const deleteDocument = (docId: string) =>
+  api.delete<{ status: string; doc_id: string }>(`/documents/${docId}`);
+
+
 export const getEntities = (docId?: string) =>
   api.get<{ name: string; type: string; mentions: number }[]>("/graph/entities", {
     params: { doc_id: docId },

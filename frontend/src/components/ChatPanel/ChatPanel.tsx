@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Send, User, Bot, Loader2 } from "lucide-react";
+import { Send, User, Bot, Loader2, Sparkles } from "lucide-react";
 import { HeroState } from "../HeroState/HeroState";
 
 interface Message {
@@ -9,9 +9,10 @@ interface Message {
 
 interface Props {
   docIds: string[];
+  summarizeSignal?: number;
 }
 
-export const ChatPanel: React.FC<Props> = ({ docIds }) => {
+export const ChatPanel: React.FC<Props> = ({ docIds, summarizeSignal }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -22,10 +23,10 @@ export const ChatPanel: React.FC<Props> = ({ docIds }) => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
-  const sendMessage = async () => {
-    if (!input.trim() || loading) return;
-    const question = input.trim();
-    setInput("");
+  const sendMessage = async (customQuestion?: string) => {
+    const question = (customQuestion || input).trim();
+    if (!question || loading) return;
+    if (!customQuestion) setInput("");
     setMessages((prev) => [...prev, { role: "user", content: question }]);
     setLoading(true);
 
@@ -63,26 +64,51 @@ export const ChatPanel: React.FC<Props> = ({ docIds }) => {
     setLoading(false);
   };
 
+  const handleSummarizeAll = () => {
+    const prompt = docIds.length === 1
+      ? "Please provide a detailed, structured summary of the uploaded document, including key takeaways and main concepts."
+      : `Please provide a detailed, structured summary synthesizing all ${docIds.length} uploaded documents, highlighting key topics, main findings, and differences across all files.`;
+    sendMessage(prompt);
+  };
+
+  useEffect(() => {
+    if (summarizeSignal && summarizeSignal > 0) {
+      handleSummarizeAll();
+    }
+  }, [summarizeSignal]);
+
   if (docIds.length === 0) {
     return <HeroState />;
   }
 
   return (
     <div className="flex flex-col h-full bg-slate-950">
-      <div className="flex items-center gap-6 px-6 py-4 border-b border-white/10 bg-white/5 backdrop-blur-xl">
-        {['Chat'].map(tab => (
-          <button 
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`text-sm font-medium pb-4 -mb-4 border-b-2 transition-colors ${
-              activeTab === tab 
-                ? 'border-violet-500 text-violet-400' 
-                : 'border-transparent text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            {tab}
-          </button>
-        ))}
+      <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-white/5 backdrop-blur-xl">
+        <div className="flex items-center gap-6">
+          {['Chat'].map(tab => (
+            <button 
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`text-sm font-medium pb-4 -mb-4 border-b-2 transition-colors ${
+                activeTab === tab 
+                  ? 'border-violet-500 text-violet-400' 
+                  : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
+
+        <button
+          onClick={handleSummarizeAll}
+          disabled={loading}
+          className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium bg-violet-600/20 hover:bg-violet-600/30 text-violet-300 border border-violet-500/30 rounded-lg transition-all shadow-sm hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
+          title="Summarize all uploaded PDFs"
+        >
+          <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+          <span>Summarize All {docIds.length > 1 ? `(${docIds.length} PDFs)` : ''}</span>
+        </button>
       </div>
 
       <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-6">
@@ -128,7 +154,7 @@ export const ChatPanel: React.FC<Props> = ({ docIds }) => {
           />
           <button 
             className="absolute right-2 p-2 bg-violet-600 hover:bg-violet-500 disabled:bg-slate-800 disabled:text-slate-500 text-white rounded-lg transition-colors"
-            onClick={sendMessage} 
+            onClick={() => sendMessage()} 
             disabled={loading || !input.trim()}
           >
             <Send className="w-4 h-4" />
@@ -138,3 +164,4 @@ export const ChatPanel: React.FC<Props> = ({ docIds }) => {
     </div>
   );
 };
+
