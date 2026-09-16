@@ -28,7 +28,7 @@ Documents (PDF, DOCX, images)
   Neo4j Graph  (Document → Chunk → Entity nodes)
         │
         ▼
-  Query: GraphTraversal + VectorSearch → HybridRanker → Groq LLM (fallback to local Ollama) (streaming)
+  Query: GraphTraversal + VectorSearch → HybridRanker → Groq LLM (streaming)
 ```
 
 **Stack**
@@ -39,7 +39,7 @@ Documents (PDF, DOCX, images)
 | Graph DB | Neo4j 5.19 (Graph Data Science plugin) |
 | Vector Store | FAISS + `all-MiniLM-L6-v2` embeddings |
 | NLP | spaCy `en_core_web_sm` |
-| LLM | Groq API (`llama-3.3-70b-versatile`) with local Ollama fallback (`qwen3:8b`) |
+| LLM | Groq API (`llama-3.3-70b-versatile`) |
 | Frontend | React + TypeScript + Vite + Tailwind CSS |
 | Container | Docker Compose |
 
@@ -165,7 +165,7 @@ graph-rag-system/
 
 1. **Ingestion** — Upload a document. The backend parses it (PDF text extraction or OCR for scanned pages), splits it into semantic chunks, extracts named entities with spaCy, stores everything as a graph in Neo4j, and indexes chunk embeddings in FAISS.
 
-2. **Query** — Ask a question. The query is parsed to identify entities, a multi-hop BFS traversal finds relevant chunks via the graph, vector search finds semantically similar chunks, a hybrid ranker merges both result sets, and the final context is streamed through Groq's LLM. If Groq encounters an error or rate limit, the system automatically falls back to a local Ollama model (`qwen3:8b`).
+2. **Query** — Ask a question. The query is parsed to identify entities, a multi-hop BFS traversal finds relevant chunks via the graph, vector search finds semantically similar chunks, a hybrid ranker merges both result sets, and the final context is streamed through Groq's LLM.
 
 3. **Visualization** — The frontend renders the document's entity graph using Cytoscape.js so you can explore relationships visually.
 

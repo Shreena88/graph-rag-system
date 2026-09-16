@@ -6,9 +6,10 @@ services:
       - "7687:7687"   # Bolt
     environment:
       NEO4J_AUTH: neo4j/password
-      NEO4J_PLUGINS: '["graph-data-science"]'
+      # Removed NEO4J_PLUGINS to prevent auto-downloading, loading from local instead.
     volumes:
       - neo4j_data:/data
+      - ./plugins:/plugins
 
   backend:
     build: ./backend

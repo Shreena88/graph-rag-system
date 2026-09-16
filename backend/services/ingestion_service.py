@@ -137,5 +137,6 @@ async def delete_document(doc_id: str) -> bool:
         logger.warning("Failed to delete document %s from Neo4j: %s", doc_id, e)
 
     vector_store._metadata = [m for m in vector_store._metadata if m.get("doc_id") != doc_id]
+    vector_store.save()
     return True
 

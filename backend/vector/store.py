@@ -1,3 +1,5 @@
+import os
+import json
 import numpy as np
 from typing import List
 from dataclasses import dataclass
@@ -19,6 +21,10 @@ class VectorStore:
         self._model_name = embedding_model
         self._index = None
         self._metadata: List[dict] = []
+        
+        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        self.save_dir = os.path.join(base_dir, "vector_store")
+        self.load()
 
     def _get_model(self):
         if self._model is None:
@@ -32,18 +38,52 @@ class VectorStore:
             self._index = faiss.IndexFlatIP(self.dim)
         return self._index
 
+    def load(self):
+        import faiss
+        os.makedirs(self.save_dir, exist_ok=True)
+        index_path = os.path.join(self.save_dir, "index.faiss")
+        meta_path = os.path.join(self.save_dir, "metadata.json")
+        
+        if os.path.exists(index_path) and os.path.exists(meta_path):
+            try:
+                self._index = faiss.read_index(index_path)
+                with open(meta_path, "r", encoding="utf-8") as f:
+                    self._metadata = json.load(f)
+                print(f"[VectorStore] Loaded {len(self._metadata)} vectors from disk.")
+            except Exception as e:
+                print(f"[VectorStore] Error loading index: {e}")
+                self._index = faiss.IndexFlatIP(self.dim)
+                self._metadata = []
+        else:
+            self._index = faiss.IndexFlatIP(self.dim)
+            self._metadata = []
+
+    def save(self):
+        import faiss
+        os.makedirs(self.save_dir, exist_ok=True)
+        index_path = os.path.join(self.save_dir, "index.faiss")
+        meta_path = os.path.join(self.save_dir, "metadata.json")
+        
+        faiss.write_index(self._get_index(), index_path)
+        with open(meta_path, "w", encoding="utf-8") as f:
+            json.dump(self._metadata, f)
+
     def add(self, chunk_id: str, text: str, doc_id: str = "", page_number: int = 0):
         model = self._get_model()
         embedding = model.encode([text], normalize_embeddings=True)
         self._get_index().add(embedding.astype(np.float32))
         self._metadata.append({"chunk_id": chunk_id, "text": text, "doc_id": doc_id, "page_number": page_number})
+        self.save()
 
     def add_batch(self, chunks: List[dict]):
+        if not chunks:
+            return
         model = self._get_model()
         texts = [c["text"] for c in chunks]
         embeddings = model.encode(texts, batch_size=64, normalize_embeddings=True)
         self._get_index().add(embeddings.astype(np.float32))
         self._metadata.extend(chunks)
+        self.save()
 
     def search(self, query: str, top_k: int = 10) -> List[VectorMatch]:
         if self._get_index().ntotal == 0:
@@ -59,5 +99,5 @@ class VectorStore:
         return results
 
 
-# In-memory only — resets on every restart
+# Persisted to disk on every change
 vector_store = VectorStore()

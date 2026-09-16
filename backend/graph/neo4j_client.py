@@ -11,11 +11,18 @@ class Neo4jClient:
     _driver: AsyncDriver = None
 
     async def connect(self):
-        self._driver = AsyncGraphDatabase.driver(
+        driver = AsyncGraphDatabase.driver(
             settings.neo4j_uri,
             auth=(settings.neo4j_user, settings.neo4j_password),
             max_connection_pool_size=50,
         )
+        try:
+            await driver.verify_connectivity()
+            self._driver = driver
+        except Exception as e:
+            await driver.close()
+            self._driver = None
+            raise e
 
     async def close(self):
         if self._driver:
@@ -51,7 +58,7 @@ class Neo4jClient:
                     import asyncio
                     await asyncio.sleep(1)
                 else:
-                    raise
+                    logging.getLogger(__name__).error("Neo4j write failed: %s", e)
 
     async def init_schema(self):
         statements = [
